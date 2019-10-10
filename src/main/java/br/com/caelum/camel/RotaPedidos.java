@@ -9,7 +9,7 @@ public class RotaPedidos {
 	public static void main(String[] args) throws Exception {
 
 		CamelContext context = new DefaultCamelContext();
-		//no meu contexto , adiciono uma nova rota que será definida no configue logo a baixo
+		//no meu contexto , adiciono uma nova rota que será definida no configue logo abaixo
 		context.addRoutes(new RouteBuilder() {
 			
 			
@@ -17,7 +17,7 @@ public class RotaPedidos {
 			public void configure() throws Exception {
 				//para primeiro exemplo vamos pegar os arquivos que estão na pasta pedidos
 				//e transferi-los para a pasta saida
-				//o parâmetro noop=true não aaga os arquivos da pasta origem
+				//o parâmetro noop=true não apaga os arquivos da pasta origem
 				from("file:pedidos?delay=5s&noop=true").
 					log("${id}").marshal().xmljson().
 					log("${body}").
