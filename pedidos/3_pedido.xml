@@ -16,7 +16,7 @@
             </livro>
         </item>
         <item>
-            <formato>EBOOK</formato>
+            <formato>IMPRESSO</formato>
             <quantidade>1</quantidade>
             <livro>
                 <codigo>ARQ</codigo>
