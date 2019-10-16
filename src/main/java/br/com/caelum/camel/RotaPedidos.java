@@ -2,6 +2,7 @@ package br.com.caelum.camel;
 
 import java.text.SimpleDateFormat;
 
+import org.apache.activemq.camel.component.ActiveMQComponent;
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
@@ -34,15 +35,29 @@ public class RotaPedidos {
 		SimpleRegistry registro = new SimpleRegistry();
 		registro.put("mysql", criaDataSource());
 		CamelContext context = new DefaultCamelContext(registro);//construtor recebe registro
+		context.addComponent("activemq", ActiveMQComponent.activeMQComponent("tcp://localhost:8161"));
 		
 		RouteBuilder rota1 = new RouteBuilder() {
 			
 				@Override
 				public void configure() throws Exception {
 					//Antes de mais nada precisamos definir o errohandler
-					errorHandler(deadLetterChannel("file:erro")); // entrega a mensagem de erro para o errohandler
+					errorHandler(deadLetterChannel("file:erro").
+							 maximumRedeliveries(3).
+							 useOriginalMessage().
+							 redeliveryDelay(2000).
+							 onRedelivery(new Processor() {            
+						            @Override
+						            public void process(Exchange exchange) throws Exception {
+						            	int counter = (int) exchange.getIn().getHeader(Exchange.REDELIVERY_COUNTER);
+						                int max = (int) exchange.getIn().getHeader(Exchange.REDELIVERY_MAX_COUNTER);
+						                System.out.println("Redelivery - " + counter + "/" + max );
+						            }
+						        })
+							 ); 
 					
-					from("file:pedidos?delay=5s&noop=true").
+					//from("file:pedidos?delay=5s&noop=true").
+					from("activemq:queue:pedidos").
 						routeId("rota-pedidos").
 						to("validator:pedido.xsd"). // antes de iniciarmos nossas rotas precisamos validar o pedido, se o mesmo segue o padrão esperado
 													// para isso utilizaremos um arquivo xsd onde constam os validadores de cada atributo
@@ -81,7 +96,7 @@ public class RotaPedidos {
 					from("direct:soap").
 						routeId("rota-soap").
 						to("xslt:pedido-para-soap.xslt").
-						log("${body}").
+						log("Resultadro do template: ${body}").
 						setHeader(Exchange.CONTENT_TYPE, constant("text/xml")). //indica que o conteudo pe XML
 					to("http4://localhost:8080/webservices/financeiro");
 
