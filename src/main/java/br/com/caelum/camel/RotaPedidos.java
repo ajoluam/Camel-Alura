@@ -39,8 +39,22 @@ public class RotaPedidos {
 			
 				@Override
 				public void configure() throws Exception {
+					//Antes de mais nada precisamos definir o errohandler
+					errorHandler(deadLetterChannel("file:erro")); // entrega a mensagem de erro para o errohandler
 					
 					from("file:pedidos?delay=5s&noop=true").
+						routeId("rota-pedidos").
+						to("validator:pedido.xsd"). // antes de iniciarmos nossas rotas precisamos validar o pedido, se o mesmo segue o padrão esperado
+													// para isso utilizaremos um arquivo xsd onde constam os validadores de cada atributo
+						multicast().
+						//parallelProcessing(). - permite que cada sub-rota seja executada em uma thread diferente
+						//timeout(5000. - podemos definir um timeout em milisegundos para o processamento
+							to("direct:http"). // no lugar do direct (sincrono) podemo usar o seda(assincrono)
+							to("direct:soap");
+					
+					
+					from("direct:http").
+						routeId("rota-http").
 						setProperty("pedidoId", xpath("/pedido/id/text()")).
 						setProperty("clienteId", xpath("/pedido/pagamento/email-titular/text()")).
 						split(). // padrão
@@ -61,6 +75,15 @@ public class RotaPedidos {
 						setHeader(Exchange.HTTP_QUERY,simple("ebookId=${property.ebookId}&clienteId=${property.clienteId}&pedidoId=${property.pedidoId}")).
 					// to("file:saida"); - no primeiro momento apenas transferimos entre pastas
 					to("http4://localhost:8080/webservices/ebook/item");
+					
+					
+					
+					from("direct:soap").
+						routeId("rota-soap").
+						to("xslt:pedido-para-soap.xslt").
+						log("${body}").
+						setHeader(Exchange.CONTENT_TYPE, constant("text/xml")). //indica que o conteudo pe XML
+					to("http4://localhost:8080/webservices/financeiro");
 
 				}
 			
@@ -106,10 +129,13 @@ public class RotaPedidos {
 		
 	};
 
-		context.addRoutes(rota2);
+		
+	
+	
+	context.addRoutes(rota1);
 
 	context.start();
-	Thread.sleep(5000);
+	Thread.sleep(10000);
 	context.stop();
 
 }}
